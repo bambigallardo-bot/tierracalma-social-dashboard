@@ -66,9 +66,12 @@ function followersByMonth(monthly, currentTotal, gainKey) {
 }
 
 // ---------------- UI helpers ----------------
-function Card({ label, value, accent, change }) {
+function Card({ label, value, accent, change, invert }) {
   const arrow = change ? (change.dir > 0 ? "▲" : change.dir < 0 ? "▼" : "▬") : null;
-  const color = change ? (change.dir > 0 ? "#16a34a" : change.dir < 0 ? "#dc2626" : "#6b7280") : null;
+  // invert: para métricas de costo (CPC, costo x conversación) bajar es bueno (verde).
+  const good = invert ? "#dc2626" : "#16a34a";
+  const bad = invert ? "#16a34a" : "#dc2626";
+  const color = change ? (change.dir > 0 ? good : change.dir < 0 ? bad : "#6b7280") : null;
   return (
     <div style={{ background: "#ffffff", border: "1px solid #e4e7ec", borderRadius: 14, padding: "16px 18px", minWidth: 0, boxShadow: "0 1px 2px rgba(16,24,40,0.04)" }}>
       <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>{label}</div>
@@ -1034,11 +1037,11 @@ Revisar a inicio de mes en modo edición (<code>?edit</code>): leer las conclusi
         {ads?.cur ? (
           <>
             <div style={grid(150)}>
-              <Card label="Inversión total" value={fmtMoney(ads.cur.spend)} accent="#d97706" change={delta(ads.cur.spend, ads.prev?.spend)} />
-              <Card label="Visitas a la web (LP)" value={fmt(ads.cur.landingViews)} accent="#2563eb" change={delta(ads.cur.landingViews, ads.prev?.landingViews)} />
-              <Card label="Leads (formularios)" value={fmt(ads.cur.leads)} accent="#16a34a" change={delta(ads.cur.leads, ads.prev?.leads)} />
-              <Card label="Costo / lead" value={fmtMoney(ads.cur.costPerLead)} change={delta(ads.cur.costPerLead, ads.prev?.costPerLead)} />
-              <Card label="Conversaciones" value={fmt(ads.cur.conversations)} change={delta(ads.cur.conversations, ads.prev?.conversations)} />
+              <Card label="Inversión" value={fmtMoney(ads.cur.spend)} accent="#d97706" change={delta(ads.cur.spend, ads.prev?.spend)} />
+              <Card label="Conversaciones" value={fmt(ads.cur.conversations)} accent="#16a34a" change={delta(ads.cur.conversations, ads.prev?.conversations)} />
+              <Card label="Costo x conversación" value={fmtMoney(ads.cur.cpr)} change={delta(ads.cur.cpr, ads.prev?.cpr)} invert />
+              <Card label="Clics" value={fmt(ads.cur.clicks)} accent="#2563eb" change={delta(ads.cur.clicks, ads.prev?.clicks)} />
+              <Card label="CPC" value={fmtMoney(ads.cur.cpc)} change={delta(ads.cur.cpc, ads.prev?.cpc)} invert />
               <Card label="Alcance" value={fmt(ads.cur.reach)} accent="#7c3aed" change={delta(ads.cur.reach, ads.prev?.reach)} />
             </div>
 
