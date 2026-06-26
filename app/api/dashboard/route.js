@@ -34,7 +34,7 @@ export async function GET() {
   }
 
   try {
-    const months = lastMonths(Number(process.env.SOCIAL_MONTHS || 12));
+    const months = lastMonths(Number(process.env.SOCIAL_MONTHS || 6));
 
     // Tierra Calma: solo Meta (Instagram orgánico + Meta Ads + mejores anuncios).
     const meta = await getMetaDashboard(months);
