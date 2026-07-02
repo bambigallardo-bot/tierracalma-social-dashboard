@@ -876,7 +876,7 @@ export default function Page() {
   // Series para gráficos de evolución (todos los meses, ascendente).
   const igSeries = (ig?.series || []).map((x) => ({ name: monthLabel(x.key).split(" ")[0], Alcance: x.reach, Interacciones: x.interactions }));
   const fbSeries = (fb?.series || []).map((x) => ({ name: monthLabel(x.key).split(" ")[0], Visualizaciones: x.impressions, Interacciones: x.engagement }));
-  const adsSeries = (ads?.series || []).map((x) => ({ name: monthLabel(x.key).split(" ")[0], "Visitas LP": x.landingViews || 0, Leads: x.leads || 0, Inversión: x.spend || 0 }));
+  const adsSeries = (ads?.series || []).map((x) => ({ name: monthLabel(x.key).split(" ")[0], "Visitas LP": x.landingViews || 0, Leads: x.leads || 0, Conversaciones: x.conversations || 0, Inversión: x.spend || 0 }));
   const bestAds = useMemo(() => (data?.bestAds?.byMonth?.[sel]) || [], [data, sel]);
   const emailSeries = (emailAgg?.series || []).map((x) => ({ name: monthLabel(x.key).split(" ")[0], "Open Rate": x.openRate, CTOR: x.ctor }));
   const gadsSeries = (gads?.series || []).map((x) => ({ name: monthLabel(x.key).split(" ")[0], Conversiones: x.conversions, "Costo/conv.": x.costPerConv }));
@@ -1077,11 +1077,11 @@ Revisar a inicio de mes en modo edición (<code>?edit</code>): leer las conclusi
                     <Bar dataKey="Visitas LP" fill="#2E404D" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ChartBox>
-                <ChartBox title="Leads por mes">
+                <ChartBox title="Conversaciones por mes">
                   <BarChart data={adsSeries}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e4e7ec" />
                     <XAxis dataKey="name" {...axis} /><YAxis {...axis} /><Tooltip {...tip} />
-                    <Bar dataKey="Leads" fill="#334155" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Conversaciones" fill="#334155" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ChartBox>
               </div>
