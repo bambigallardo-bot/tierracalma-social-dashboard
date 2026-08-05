@@ -488,6 +488,90 @@ function Thumb({ src, alt }) {
 }
 
 // ---------------- Editor de LinkedIn (modo edición — manual con gráficos) ----------------
+// Parser tolerante al formato chileno: "3,36" -> 3.36 · "13.572" -> 13572
+function parseNumCL(v) {
+  if (v == null) return null;
+  let s = String(v).trim().replace(/%/g, "").replace(/\s/g, "");
+  if (s === "") return null;
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
+  const n = Number(s);
+  return isNaN(n) ? null : n;
+}
+
+// Editor manual de Facebook (modo edición). El CM corrige/completa lo que trae la API.
+function FacebookEditor({ source, monthKey, onSave }) {
+  const src = source || {};
+  const seedM = (src.monthly || {})[monthKey] || {};
+  const seedBest = ((src.best || {})[monthKey] || []).map((b) => ({ ...b }));
+  while (seedBest.length < 3) seedBest.push({ message: "", date: "", reach: "", thumb: "" });
+  const [followers, setFollowers] = useState((src.followers || {})[monthKey] ?? "");
+  const [m, setM] = useState({
+    fanAdds: seedM.fanAdds ?? "", reach: seedM.reach ?? "", impressions: seedM.impressions ?? "",
+    engagement: seedM.engagement ?? "", profileViews: seedM.profileViews ?? "",
+  });
+  const [best, setBest] = useState(seedBest);
+  const [saving, setSaving] = useState(false);
+  const [ok, setOk] = useState(false);
+  const inp = { background: "#f4f5f7", color: "#1a1a1a", border: "1px solid #e4e7ec", borderRadius: 6, padding: "6px 8px", fontSize: 13, width: "100%", boxSizing: "border-box" };
+  const num = parseNumCL;
+  const updM = (f, v) => setM((o) => ({ ...o, [f]: v }));
+  const updB = (i, f, v) => setBest((rs) => rs.map((r, idx) => (idx === i ? { ...r, [f]: v } : r)));
+  const save = async () => {
+    setSaving(true); setOk(false);
+    const obj = { followers: { ...(src.followers || {}) }, monthly: { ...(src.monthly || {}) }, best: { ...(src.best || {}) } };
+    if (num(followers) != null) obj.followers[monthKey] = num(followers);
+    obj.monthly[monthKey] = {
+      fanAdds: num(m.fanAdds) ?? 0, reach: num(m.reach) ?? 0, impressions: num(m.impressions) ?? 0,
+      engagement: num(m.engagement) ?? 0, profileViews: num(m.profileViews) ?? 0,
+    };
+    const cleanBest = best
+      .filter((b) => (b.message || "").trim())
+      .map((b) => ({ message: b.message.trim(), date: b.date || "", reach: num(b.reach) ?? 0, thumb: (b.thumb || "").trim() || undefined }));
+    if (cleanBest.length) obj.best[monthKey] = cleanBest; else delete obj.best[monthKey];
+    const r = await onSave(obj);
+    setSaving(false); setOk(r !== false);
+  };
+  const field = (label, val, setter) => (
+    <label style={{ fontSize: 12, color: "#6b7280" }}>{label}
+      <input value={val} onChange={(e) => setter(e.target.value)} style={{ ...inp, marginTop: 4 }} inputMode="numeric" placeholder="—" />
+    </label>
+  );
+  return (
+    <div className="no-print" style={{ ...panel, marginBottom: 16, borderLeft: `3px solid ${BRAND}` }}>
+      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>✏️ Editar Facebook · {monthLabel(monthKey)} <span style={{ color: "#6b7280", fontWeight: 400 }}>(corrige o completa lo que trae la API; los gráficos se generan solos)</span></div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10 }}>
+        {field("Seguidores (total)", followers, setFollowers)}
+        {field("Nuevos seguidores", m.fanAdds, (v) => updM("fanAdds", v))}
+        {field("Alcance", m.reach, (v) => updM("reach", v))}
+        {field("Visualizaciones", m.impressions, (v) => updM("impressions", v))}
+        {field("Interacciones", m.engagement, (v) => updM("engagement", v))}
+        {field("Visitas al perfil", m.profileViews, (v) => updM("profileViews", v))}
+      </div>
+      <div style={{ fontSize: 12, fontWeight: 600, marginTop: 16, marginBottom: 8 }}>🏆 Mejores publicaciones (hasta 3)</div>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ ...tableStyle, background: "transparent" }}>
+          <thead><tr><th style={th}>Publicación</th><th style={th}>Fecha</th><th style={th}>Alcance</th><th style={th}>Imagen (URL)</th></tr></thead>
+          <tbody>
+            {best.map((b, i) => (
+              <tr key={i}>
+                <td style={td}><input value={b.message} onChange={(e) => updB(i, "message", e.target.value)} style={inp} placeholder="POST: …" /></td>
+                <td style={td}><input value={b.date} onChange={(e) => updB(i, "date", e.target.value)} style={{ ...inp, width: 90 }} placeholder="5 mayo" /></td>
+                <td style={td}><input value={b.reach} onChange={(e) => updB(i, "reach", e.target.value)} style={{ ...inp, width: 90 }} inputMode="numeric" /></td>
+                <td style={td}><input value={b.thumb} onChange={(e) => updB(i, "thumb", e.target.value)} style={{ ...inp, minWidth: 160 }} placeholder="https://…" /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center" }}>
+        <button disabled={saving} onClick={save} style={{ ...miniBtn, background: BRAND, color: "#fff", border: "none" }}>{saving ? "Guardando…" : "Guardar Facebook"}</button>
+        {ok && <span style={{ color: "#16a34a", fontSize: 13 }}>✓ Guardado</span>}
+      </div>
+    </div>
+  );
+}
+
 function LinkedinEditor({ source, monthKey, onSave }) {
   const src = source || {};
   const seedM = (src.monthly || {})[monthKey] || {};
@@ -636,7 +720,7 @@ export default function Page() {
   const [sel, setSel] = useState(null);
 
   // Modo edición + overrides compartidos (servidor).
-  const [server, setServer] = useState({ conclusions: {}, competencia: null, linkedin: null, kv: false });
+  const [server, setServer] = useState({ conclusions: {}, competencia: null, linkedin: null, facebook: null, kv: false });
   const [editParam, setEditParam] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editPass, setEditPass] = useState("");
@@ -661,7 +745,7 @@ export default function Page() {
     try {
       const res = await fetch("/api/overrides", { cache: "no-store" });
       const j = await res.json();
-      setServer({ conclusions: j.conclusions || {}, competencia: j.competencia || null, linkedin: j.linkedin || null, kv: !!j.kv });
+      setServer({ conclusions: j.conclusions || {}, competencia: j.competencia || null, linkedin: j.linkedin || null, facebook: j.facebook || null, kv: !!j.kv });
     } catch (_) {}
   }, []);
 
@@ -709,6 +793,12 @@ export default function Page() {
     const j = await res.json().catch(() => ({})); alert("No se pudo guardar: " + (j.error || res.status)); return false;
   }, [editPass]);
 
+  const saveFacebook = useCallback(async (obj) => {
+    const res = await fetch("/api/overrides", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password: editPass, type: "facebook", value: obj }) });
+    if (res.ok) { setServer((s) => ({ ...s, facebook: obj })); return true; }
+    const j = await res.json().catch(() => ({})); alert("No se pudo guardar: " + (j.error || res.status)); return false;
+  }, [editPass]);
+
   const editCtxValue = useMemo(() => ({
     kv: server.kv,
     canEdit: editMode,
@@ -739,16 +829,24 @@ export default function Page() {
     return { followers: fMap[sel] ?? m.followers, fPrev: fMap[prevKey] ?? null, username: m.username, cur, prev, best: m.bestByMonth?.[sel] || [], series: monthly };
   }, [data, sel, prevKey]);
 
-  // --- Facebook ---
+  // --- Facebook (automático por API + override manual del CM con prioridad) ---
   const fb = useMemo(() => {
-    const m = data?.facebook;
-    if (!m) return null;
-    const monthly = m.monthly || [];
-    const fMap = followersByMonth(monthly, m.followers ?? null, "fanAdds");
-    const cur = monthly.find((x) => x.key === sel) || null;
-    const prev = monthly.find((x) => x.key === prevKey) || null;
-    return { followers: fMap[sel] ?? m.followers, fPrev: fMap[prevKey] ?? null, name: m.name, cur, prev, best: m.bestByMonth?.[sel] || [], series: monthly };
-  }, [data, sel, prevKey]);
+    const api = data?.facebook;
+    const man = server.facebook || data?.manual?.facebook;
+    if (!api && !man) return null;
+    const apiMonthly = {};
+    for (const x of api?.monthly || []) apiMonthly[x.key] = x;
+    const monthlyOf = (k) => (man?.monthly?.[k]) || apiMonthly[k] || null;
+    const cur = monthlyOf(sel);
+    const prev = monthlyOf(prevKey);
+    const manFollowers = man?.followers || {};
+    const followers = manFollowers[sel] ?? api?.followers ?? null;
+    const fPrev = manFollowers[prevKey] ?? api?.followers ?? null;
+    const best = (man?.best?.[sel]?.length ? man.best[sel] : api?.bestByMonth?.[sel]) || [];
+    const series = months.map((k) => ({ key: k, ...(monthlyOf(k) || {}) }));
+    const manual = !!(server.facebook || data?.manual?.facebook);
+    return { followers, fPrev, name: api?.name, cur, prev, best, series, hasMonth: !!cur, connected: !!api && !manual };
+  }, [data, server.facebook, sel, prevKey, months]);
 
   // --- Meta Ads ---
   const ads = useMemo(() => {
@@ -1030,6 +1128,67 @@ Revisar a inicio de mes en modo edición (<code>?edit</code>): leer las conclusi
           </>
         ) : !data?.errors?.instagram && <div style={{ color: "#6b7280", fontSize: 13 }}>Sin datos de Instagram para {monthLabel(sel)}.</div>}
       </Section>
+
+      {/* FACEBOOK (automático por API + editable por el CM) */}
+      {(fb || editMode) && (
+      <Section title={<span>👍 Facebook (orgánico) <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: fb?.connected ? "#dcfce7" : "#e5edf5", color: fb?.connected ? "#166534" : BRAND, verticalAlign: "middle" }}>{fb?.connected ? "AUTO · API" : "MANUAL"}{editMode ? " · EDITABLE" : ""}</span></span>} subtitle={fb?.name ? fb.name : "Datos de la página de Facebook."}>
+        {data?.errors?.facebook && <div style={{ color: "#b45309", fontSize: 13, marginBottom: 10 }}>Facebook: {data.errors.facebook}</div>}
+        {editMode && (
+          <FacebookEditor source={server.facebook || data?.manual?.facebook} monthKey={sel} onSave={saveFacebook} />
+        )}
+        {fb?.cur ? (
+          <>
+            <div style={grid(150)}>
+              <Card label="Seguidores" value={fmt(fb.followers)} accent="#7c3aed" change={delta(fb.followers, fb.fPrev)} />
+              <Card label="Nuevos seguidores" value={fmt(fb.cur.fanAdds)} accent="#16a34a" change={delta(fb.cur.fanAdds, fb.prev?.fanAdds)} />
+              <Card label="Alcance" value={fmt(fb.cur.reach)} accent="#2563eb" change={delta(fb.cur.reach, fb.prev?.reach)} />
+              <Card label="Visualizaciones" value={fmt(fb.cur.impressions)} change={delta(fb.cur.impressions, fb.prev?.impressions)} />
+              <Card label="Interacciones" value={fmt(fb.cur.engagement)} change={delta(fb.cur.engagement, fb.prev?.engagement)} />
+              <Card label="Visitas al perfil" value={fmt(fb.cur.profileViews)} change={delta(fb.cur.profileViews, fb.prev?.profileViews)} />
+            </div>
+            {fb.series.filter((x) => x.reach || x.engagement).length > 1 && (
+              <div style={{ ...grid(320), marginTop: 16 }}>
+                <ChartBox title="Alcance por mes">
+                  <LineChart data={fb.series.map((x) => ({ name: monthLabel(x.key).split(" ")[0], Alcance: x.reach || 0 }))}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e4e7ec" />
+                    <XAxis dataKey="name" {...axis} /><YAxis {...axis} /><Tooltip {...tip} />
+                    <Line type="monotone" dataKey="Alcance" stroke="#2E404D" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ChartBox>
+                <ChartBox title="Interacciones por mes">
+                  <BarChart data={fb.series.map((x) => ({ name: monthLabel(x.key).split(" ")[0], Interacciones: x.engagement || 0 }))}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e4e7ec" />
+                    <XAxis dataKey="name" {...axis} /><YAxis {...axis} /><Tooltip {...tip} />
+                    <Bar dataKey="Interacciones" fill="#334155" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ChartBox>
+              </div>
+            )}
+            {fb.best?.length > 0 && (
+              <div style={{ marginTop: 24 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 10 }}>🏆 Mejores publicaciones del mes (por alcance)</div>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={tableStyle}>
+                    <thead><tr><th style={th}>#</th><th style={th}>Publicación</th><th style={th}>Fecha</th><th style={th}>Alcance</th></tr></thead>
+                    <tbody>
+                      {fb.best.map((p, i) => (
+                        <tr key={i}>
+                          <td style={{ ...td, color: "#d97706", fontWeight: 700 }}>{i + 1}</td>
+                          <td style={td}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><Thumb src={p.thumb} alt={p.message} />{p.permalink ? <a href={p.permalink} target="_blank" rel="noreferrer" style={{ color: "#374151" }}>{p.message || "(sin texto)"}</a> : (p.message || "(sin texto)")}</div></td>
+                          <td style={td}>{p.date}</td>
+                          <td style={{ ...td, color: "#2563eb", fontWeight: 600 }}>{fmt(p.reach)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+            <Conclusion id={`fb-${sel}`} text={fbConclusion(sel, fb.cur, fb.prev, fb.followers)} />
+          </>
+        ) : !data?.errors?.facebook && <div style={alertBox}>⚠️ Sin datos de Facebook para {monthLabel(sel)}.{editMode ? " Llena los campos de arriba y guarda." : ""}</div>}
+      </Section>
+      )}
 
       {/* META ADS (PAID) */}
       <Section title="🎯 Meta Ads (paid)" subtitle="Inversión por objetivo: Tráfico (visitas a la web), Formularios (leads) y Mensajes (conversaciones)">

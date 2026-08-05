@@ -43,6 +43,7 @@ export async function GET() {
       updatedAt: new Date().toISOString(),
       months: meta.months,
       instagram: meta.instagram,
+      facebook: meta.facebook || null,
       ads: meta.ads,
       bestAds: meta.bestAds || null,
       manual: manual || null,
@@ -52,7 +53,7 @@ export async function GET() {
     };
 
     // Solo cachea si al menos una fuente vino bien (no cachear fallos totales/transitorios).
-    const anyOk = meta.instagram || meta.ads;
+    const anyOk = meta.instagram || meta.facebook || meta.ads;
     if (anyOk) {
       _cache = { at: Date.now(), data: result };
       return Response.json(result, { headers: { "Cache-Control": "no-store" } });
