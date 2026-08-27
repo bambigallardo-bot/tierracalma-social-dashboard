@@ -723,6 +723,9 @@ export default function Page() {
   const [server, setServer] = useState({ conclusions: {}, competencia: null, linkedin: null, facebook: null, kv: false });
   const [editParam, setEditParam] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  // Pestañas principales del informe. Al exportar el PDF se muestran todas.
+  const [mainTab, setMainTab] = useState("resumen");
+  const [printAll, setPrintAll] = useState(false);
   const [editPass, setEditPass] = useState("");
   const [passInput, setPassInput] = useState("");
   const [passMsg, setPassMsg] = useState("");
@@ -798,6 +801,24 @@ export default function Page() {
     if (res.ok) { setServer((s) => ({ ...s, facebook: obj })); return true; }
     const j = await res.json().catch(() => ({})); alert("No se pudo guardar: " + (j.error || res.status)); return false;
   }, [editPass]);
+
+  // El PDF debe salir completo aunque estés parada en una pestaña: se montan todas,
+  // se le da tiempo a los gráficos a dibujarse y recién ahí se abre el diálogo de impresión.
+  const exportPdf = useCallback(() => {
+    setPrintAll(true);
+    setTimeout(() => {
+      window.print();
+      setTimeout(() => setPrintAll(false), 600);
+    }, 800);
+  }, []);
+  // Atajo Cmd+P: intenta desplegar todo igual.
+  useEffect(() => {
+    const before = () => setPrintAll(true);
+    const after = () => setPrintAll(false);
+    window.addEventListener("beforeprint", before);
+    window.addEventListener("afterprint", after);
+    return () => { window.removeEventListener("beforeprint", before); window.removeEventListener("afterprint", after); };
+  }, []);
 
   const editCtxValue = useMemo(() => ({
     kv: server.kv,
@@ -980,6 +1001,13 @@ export default function Page() {
   const gadsSeries = (gads?.series || []).map((x) => ({ name: monthLabel(x.key).split(" ")[0], Conversiones: x.conversions, "Costo/conv.": x.costPerConv }));
   const ga4Series = (ga4?.series || []).map((x) => ({ name: monthLabel(x.key).split(" ")[0], Usuarios: x.activeUsers, "Eventos clave": x.keyEvents }));
 
+  const MAIN_TABS = [
+    { key: "resumen", label: "📊 Resumen" },
+    { key: "contenidos", label: "📸 Contenidos" },
+    { key: "paid", label: "🎯 Paid" },
+  ];
+  const showTab = (k) => printAll || mainTab === k;
+
   const selStyle = { background: "#f4f5f7", color: "#1a1a1a", border: "1px solid #e4e7ec", borderRadius: 8, padding: "8px 12px", fontSize: 14 };
 
   return (
@@ -1029,7 +1057,7 @@ export default function Page() {
                 {[...months].reverse().map((k) => <option key={k} value={k}>{monthLabel(k)}</option>)}
               </select>
             )}
-            <button onClick={() => window.print()} style={{ background: "#f4f5f7", color: "#1a1a1a", border: "1px solid #e4e7ec", borderRadius: 10, padding: "9px 14px", cursor: "pointer", fontSize: 14 }}>🖨️ Exportar PDF</button>
+            <button onClick={exportPdf} style={{ background: "#f4f5f7", color: "#1a1a1a", border: "1px solid #e4e7ec", borderRadius: 10, padding: "9px 14px", cursor: "pointer", fontSize: 14 }}>🖨️ Exportar PDF</button>
             <button onClick={load} style={{ background: BRAND, color: "#fff", border: "none", borderRadius: 10, padding: "9px 16px", cursor: "pointer", fontSize: 14 }}>Actualizar</button>
           </div>
           <img src="/logo-copylab.png" alt="Grupo CopyLab" title="Grupo CopyLab LATAM" style={{ height: 58, objectFit: "contain", filter: "brightness(0)" }} />
@@ -1055,6 +1083,22 @@ Revisar a inicio de mes en modo edición (<code>?edit</code>): leer las conclusi
         </div>
       </details>
 
+      {/* PESTAÑAS PRINCIPALES */}
+      <div className="no-print" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", margin: "22px 0 24px", borderBottom: "2px solid #e4e7ec", paddingBottom: 12 }}>
+        {MAIN_TABS.map((tb) => (
+          <button key={tb.key} onClick={() => setMainTab(tb.key)}
+            style={{
+              background: mainTab === tb.key ? BRAND : "transparent",
+              color: mainTab === tb.key ? "#fff" : "#374151",
+              border: `1px solid ${mainTab === tb.key ? BRAND : "#e4e7ec"}`,
+              borderRadius: 10, padding: "10px 18px", cursor: "pointer",
+              fontSize: 14.5, fontWeight: mainTab === tb.key ? 700 : 500,
+            }}>{tb.label}</button>
+        ))}
+        <span style={{ fontSize: 12, color: "#9aa3af", marginLeft: "auto" }}>El PDF sale con todas las pestañas</span>
+      </div>
+
+      {showTab("resumen") && (<>
       {/* RESUMEN EJECUTIVO */}
       {exec.length > 0 && (
         <Section title={`🧠 Resumen ejecutivo · ${monthLabel(sel)}`} subtitle="Lo más destacado del mes, por canal">
@@ -1068,6 +1112,9 @@ Revisar a inicio de mes en modo edición (<code>?edit</code>): leer las conclusi
         </Section>
       )}
 
+      </>)}
+
+      {showTab("contenidos") && (<>
       {/* INSTAGRAM */}
       <Section title="📸 Instagram (orgánico)" subtitle={ig?.username ? `@${ig.username}` : undefined}>
         {data?.errors?.instagram && <div style={{ color: "#b45309", fontSize: 13, marginBottom: 10 }}>Instagram: {data.errors.instagram}</div>}
@@ -1129,6 +1176,9 @@ Revisar a inicio de mes en modo edición (<code>?edit</code>): leer las conclusi
         ) : !data?.errors?.instagram && <div style={{ color: "#6b7280", fontSize: 13 }}>Sin datos de Instagram para {monthLabel(sel)}.</div>}
       </Section>
 
+      </>)}
+
+      {showTab("contenidos") && (<>
       {/* FACEBOOK (automático por API + editable por el CM) */}
       {(fb || editMode) && (
       <Section title={<span>👍 Facebook (orgánico) <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: fb?.connected ? "#dcfce7" : "#e5edf5", color: fb?.connected ? "#166534" : BRAND, verticalAlign: "middle" }}>{fb?.connected ? "AUTO · API" : "MANUAL"}{editMode ? " · EDITABLE" : ""}</span></span>} subtitle={fb?.name ? fb.name : "Datos de la página de Facebook."}>
@@ -1190,6 +1240,9 @@ Revisar a inicio de mes en modo edición (<code>?edit</code>): leer las conclusi
       </Section>
       )}
 
+      </>)}
+
+      {showTab("paid") && (<>
       {/* META ADS (PAID) */}
       <Section title="🎯 Meta Ads (paid)" subtitle="Inversión por objetivo: Tráfico (visitas a la web), Formularios (leads) y Mensajes (conversaciones)">
         {data?.errors?.ads && <div style={{ color: "#b45309", fontSize: 13, marginBottom: 10 }}>Meta Ads: {data.errors.ads}</div>}
@@ -1304,6 +1357,9 @@ Revisar a inicio de mes en modo edición (<code>?edit</code>): leer las conclusi
         ) : !data?.errors?.ads && <div style={{ color: "#6b7280", fontSize: 13 }}>Sin datos de Meta Ads para {monthLabel(sel)}.</div>}
       </Section>
 
+      </>)}
+
+      {showTab("resumen") && (<>
       {/* PUNTOS DE MEJORA (solo interno / modo edición) */}
       {editMode && improvements.length > 0 && (
         <Section title="🛠️ Puntos de mejora (interno)" subtitle="Solo visible en modo edición — no se muestra al cliente">
@@ -1320,6 +1376,9 @@ Revisar a inicio de mes en modo edición (<code>?edit</code>): leer las conclusi
         </Section>
       )}
 
+      </>)}
+
+      {showTab("resumen") && (<>
       {/* PLAN DEL PRÓXIMO MES (predictivo) */}
       {plan.length > 0 && (
         <Section title="🔮 Plan del próximo mes" subtitle="Acciones priorizadas y sugerencias automáticas según los datos del mes — valida según el contexto del cliente">
@@ -1335,6 +1394,8 @@ Revisar a inicio de mes en modo edición (<code>?edit</code>): leer las conclusi
           </div>
         </Section>
       )}
+
+      </>)}
 
       <footer style={{ marginTop: 50, color: "#9aa3af", fontSize: 12, textAlign: "center" }}>
         Datos vía Meta Graph API (Instagram orgánico y Meta Ads) · Tierra Calma · Padre Hurtado · Copywriters
