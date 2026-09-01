@@ -652,6 +652,56 @@ function InstagramEditor({ source, monthKey, seed, onSave }) {
   );
 }
 
+// Editor manual de Meta Ads (KPIs superiores). Precargado con la API; corrige solo lo que quieras.
+function MetaAdsEditor({ source, monthKey, seed, onSave }) {
+  const src = source || {};
+  const sm = (src.monthly || {})[monthKey] || {};
+  const sc = seed || {};
+  const val = (f) => (sm[f] != null && sm[f] !== "" ? sm[f] : (sc[f] ?? ""));
+  const [m, setM] = useState({
+    spend: val("spend"), conversations: val("conversations"), cpr: val("cpr"),
+    clicks: val("clicks"), cpc: val("cpc"), reach: val("reach"),
+  });
+  const [saving, setSaving] = useState(false);
+  const [ok, setOk] = useState(false);
+  const inp = { background: "#f4f5f7", color: "#1a1a1a", border: "1px solid #e4e7ec", borderRadius: 6, padding: "6px 8px", fontSize: 13, width: "100%", boxSizing: "border-box" };
+  const num = parseNumCL;
+  const updM = (f, v) => setM((o) => ({ ...o, [f]: v }));
+  const save = async () => {
+    setSaving(true); setOk(false);
+    const obj = { monthly: { ...(src.monthly || {}) } };
+    obj.monthly[monthKey] = {
+      spend: num(m.spend), conversations: num(m.conversations), cpr: num(m.cpr),
+      clicks: num(m.clicks), cpc: num(m.cpc), reach: num(m.reach),
+    };
+    const r = await onSave(obj);
+    setSaving(false); setOk(r !== false);
+  };
+  const field = (label, value, setter) => (
+    <label style={{ fontSize: 12, color: "#6b7280" }}>{label}
+      <input value={value} onChange={(e) => setter(e.target.value)} style={{ ...inp, marginTop: 4 }} inputMode="numeric" placeholder="—" />
+    </label>
+  );
+  return (
+    <div className="no-print" style={{ ...panel, marginBottom: 16, borderLeft: `3px solid ${BRAND}` }}>
+      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>✏️ Editar Meta Ads · {monthLabel(monthKey)} <span style={{ color: "#6b7280", fontWeight: 400 }}>(precargado de la API; corrige solo lo que necesites)</span></div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10 }}>
+        {field("Inversión", m.spend, (v) => updM("spend", v))}
+        {field("Conversaciones", m.conversations, (v) => updM("conversations", v))}
+        {field("Costo x conversación", m.cpr, (v) => updM("cpr", v))}
+        {field("Clics", m.clicks, (v) => updM("clicks", v))}
+        {field("CPC", m.cpc, (v) => updM("cpc", v))}
+        {field("Alcance", m.reach, (v) => updM("reach", v))}
+      </div>
+      <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center" }}>
+        <button disabled={saving} onClick={save} style={{ ...miniBtn, background: BRAND, color: "#fff", border: "none" }}>{saving ? "Guardando…" : "Guardar Meta Ads"}</button>
+        {ok && <span style={{ color: "#16a34a", fontSize: 13 }}>✓ Guardado</span>}
+      </div>
+      <div style={{ fontSize: 11, color: "#9aa3af", marginTop: 8, fontStyle: "italic" }}>Nota: las tablas de campañas, mejores anuncios y bloques por objetivo siguen automáticos (API).</div>
+    </div>
+  );
+}
+
 function LinkedinEditor({ source, monthKey, onSave }) {
   const src = source || {};
   const seedM = (src.monthly || {})[monthKey] || {};
@@ -800,7 +850,7 @@ export default function Page() {
   const [sel, setSel] = useState(null);
 
   // Modo edición + overrides compartidos (servidor).
-  const [server, setServer] = useState({ conclusions: {}, competencia: null, linkedin: null, facebook: null, instagram: null, kv: false });
+  const [server, setServer] = useState({ conclusions: {}, competencia: null, linkedin: null, facebook: null, instagram: null, ads: null, kv: false });
   const [editParam, setEditParam] = useState(false);
   const [editMode, setEditMode] = useState(false);
   // Pestañas principales del informe. Al exportar el PDF se muestran todas.
@@ -828,7 +878,7 @@ export default function Page() {
     try {
       const res = await fetch("/api/overrides", { cache: "no-store" });
       const j = await res.json();
-      setServer({ conclusions: j.conclusions || {}, competencia: j.competencia || null, linkedin: j.linkedin || null, facebook: j.facebook || null, instagram: j.instagram || null, kv: !!j.kv });
+      setServer({ conclusions: j.conclusions || {}, competencia: j.competencia || null, linkedin: j.linkedin || null, facebook: j.facebook || null, instagram: j.instagram || null, ads: j.ads || null, kv: !!j.kv });
     } catch (_) {}
   }, []);
 
@@ -885,6 +935,12 @@ export default function Page() {
   const saveInstagram = useCallback(async (obj) => {
     const res = await fetch("/api/overrides", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password: editPass, type: "instagram", value: obj }) });
     if (res.ok) { setServer((s) => ({ ...s, instagram: obj })); return true; }
+    const j = await res.json().catch(() => ({})); alert("No se pudo guardar: " + (j.error || res.status)); return false;
+  }, [editPass]);
+
+  const saveAds = useCallback(async (obj) => {
+    const res = await fetch("/api/overrides", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password: editPass, type: "ads", value: obj }) });
+    if (res.ok) { setServer((s) => ({ ...s, ads: obj })); return true; }
     const j = await res.json().catch(() => ({})); alert("No se pudo guardar: " + (j.error || res.status)); return false;
   }, [editPass]);
 
@@ -974,11 +1030,22 @@ export default function Page() {
   // --- Meta Ads ---
   const ads = useMemo(() => {
     const m = data?.ads;
-    if (!m) return null;
-    const cur = m.monthly?.find((x) => x.key === sel) || null;
-    const prev = m.monthly?.find((x) => x.key === prevKey) || null;
-    return { currency: m.currency, cur, prev, series: m.monthly || [] };
-  }, [data, sel, prevKey]);
+    const man = server.ads || data?.manual?.ads;
+    if (!m && !man) return null;
+    const manM = man?.monthly || {};
+    // Base API + override manual por campo (KPIs superiores); tablas/objetivos siguen de la API.
+    const mergeK = (base, k) => {
+      const o = manM[k];
+      if (!base && !o) return null;
+      const out = { ...(base || {}) };
+      if (o) for (const kk of Object.keys(o)) if (o[kk] != null && o[kk] !== "") out[kk] = o[kk];
+      return out;
+    };
+    const cur = mergeK(m?.monthly?.find((x) => x.key === sel) || null, sel);
+    const prev = mergeK(m?.monthly?.find((x) => x.key === prevKey) || null, prevKey);
+    const manual = !!(server.ads || data?.manual?.ads);
+    return { currency: m?.currency || "CLP", cur, prev, series: m?.monthly || [], connected: !!m && !manual };
+  }, [data, server.ads, sel, prevKey]);
 
   // --- Google Ads ---
   const gads = useMemo(() => {
@@ -1349,8 +1416,11 @@ Revisar a inicio de mes en modo edición (<code>?edit</code>): leer las conclusi
 
       {showTab("paid") && (<>
       {/* META ADS (PAID) */}
-      <Section title="🎯 Meta Ads (paid)" subtitle="Inversión por objetivo: Tráfico (visitas a la web), Formularios (leads) y Mensajes (conversaciones)">
+      <Section title={<span>🎯 Meta Ads (paid) {ads && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: ads.connected ? "#dcfce7" : "#e5edf5", color: ads.connected ? "#166534" : BRAND, verticalAlign: "middle" }}>{ads.connected ? "AUTO · API" : "MANUAL"}{editMode ? " · EDITABLE" : ""}</span>}</span>} subtitle="Inversión por objetivo: Tráfico (visitas a la web), Formularios (leads) y Mensajes (conversaciones)">
         {data?.errors?.ads && <div style={{ color: "#b45309", fontSize: 13, marginBottom: 10 }}>Meta Ads: {data.errors.ads}</div>}
+        {editMode && (
+          <MetaAdsEditor source={server.ads || data?.manual?.ads} monthKey={sel} seed={ads?.cur} onSave={saveAds} />
+        )}
         {ads?.cur ? (
           <>
             <div style={grid(150)}>
