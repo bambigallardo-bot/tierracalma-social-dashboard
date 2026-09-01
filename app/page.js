@@ -572,6 +572,86 @@ function FacebookEditor({ source, monthKey, onSave }) {
   );
 }
 
+// Editor manual de Instagram (modo edición). Se pre-llena con lo que trae la API;
+// el CM corrige solo lo que quiera y esos campos mandan (los demás siguen de la API).
+function InstagramEditor({ source, monthKey, seed, onSave }) {
+  const src = source || {};
+  const sm = (src.monthly || {})[monthKey] || {};
+  const sc = seed?.cur || {};
+  const val = (f) => (sm[f] != null && sm[f] !== "" ? sm[f] : (sc[f] ?? "")); // muestra manual si existe, si no el de la API
+  const seedBest = ((src.best || {})[monthKey] || (seed?.best || []).map((b) => ({ caption: b.caption || "", date: b.date || "", reach: b.reach ?? "", likes: b.likes ?? "", comments: b.comments ?? "", thumb: b.thumb || "" }))).map((b) => ({ ...b }));
+  while (seedBest.length < 3) seedBest.push({ caption: "", date: "", reach: "", likes: "", comments: "", thumb: "" });
+  const [followers, setFollowers] = useState((src.followers || {})[monthKey] ?? (seed?.followers ?? ""));
+  const [m, setM] = useState({
+    newFollowers: val("newFollowers"), reach: val("reach"), views: val("views"),
+    interactions: val("interactions"), webClicks: val("webClicks"), engagement: val("engagement"),
+  });
+  const [best, setBest] = useState(seedBest);
+  const [saving, setSaving] = useState(false);
+  const [ok, setOk] = useState(false);
+  const inp = { background: "#f4f5f7", color: "#1a1a1a", border: "1px solid #e4e7ec", borderRadius: 6, padding: "6px 8px", fontSize: 13, width: "100%", boxSizing: "border-box" };
+  const num = parseNumCL;
+  const updM = (f, v) => setM((o) => ({ ...o, [f]: v }));
+  const updB = (i, f, v) => setBest((rs) => rs.map((r, idx) => (idx === i ? { ...r, [f]: v } : r)));
+  const save = async () => {
+    setSaving(true); setOk(false);
+    const obj = { followers: { ...(src.followers || {}) }, monthly: { ...(src.monthly || {}) }, best: { ...(src.best || {}) } };
+    if (num(followers) != null) obj.followers[monthKey] = num(followers); else delete obj.followers[monthKey];
+    // Guarda null en los campos vacíos → la fusión los ignora y se usa el valor de la API.
+    obj.monthly[monthKey] = {
+      newFollowers: num(m.newFollowers), reach: num(m.reach), views: num(m.views),
+      interactions: num(m.interactions), webClicks: num(m.webClicks), engagement: num(m.engagement),
+    };
+    const cleanBest = best
+      .filter((b) => (b.caption || "").trim())
+      .map((b) => ({ caption: b.caption.trim(), date: b.date || "", reach: num(b.reach) ?? 0, likes: num(b.likes) ?? 0, comments: num(b.comments) ?? 0, thumb: (b.thumb || "").trim() || undefined }));
+    if (cleanBest.length) obj.best[monthKey] = cleanBest; else delete obj.best[monthKey];
+    const r = await onSave(obj);
+    setSaving(false); setOk(r !== false);
+  };
+  const field = (label, value, setter) => (
+    <label style={{ fontSize: 12, color: "#6b7280" }}>{label}
+      <input value={value} onChange={(e) => setter(e.target.value)} style={{ ...inp, marginTop: 4 }} inputMode="numeric" placeholder="—" />
+    </label>
+  );
+  return (
+    <div className="no-print" style={{ ...panel, marginBottom: 16, borderLeft: `3px solid ${BRAND}` }}>
+      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>✏️ Editar Instagram · {monthLabel(monthKey)} <span style={{ color: "#6b7280", fontWeight: 400 }}>(viene precargado de la API; corrige solo lo que necesites, lo demás se mantiene)</span></div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10 }}>
+        {field("Seguidores (total)", followers, setFollowers)}
+        {field("Nuevos seguidores", m.newFollowers, (v) => updM("newFollowers", v))}
+        {field("Alcance", m.reach, (v) => updM("reach", v))}
+        {field("Visualizaciones", m.views, (v) => updM("views", v))}
+        {field("Interacciones", m.interactions, (v) => updM("interactions", v))}
+        {field("Clics a la web", m.webClicks, (v) => updM("webClicks", v))}
+        {field("Engagement %", m.engagement, (v) => updM("engagement", v))}
+      </div>
+      <div style={{ fontSize: 12, fontWeight: 600, marginTop: 16, marginBottom: 8 }}>🏆 Mejores publicaciones (hasta 3)</div>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ ...tableStyle, background: "transparent" }}>
+          <thead><tr><th style={th}>Publicación</th><th style={th}>Fecha</th><th style={th}>Alcance</th><th style={th}>Likes</th><th style={th}>Coment.</th><th style={th}>Imagen (URL)</th></tr></thead>
+          <tbody>
+            {best.map((b, i) => (
+              <tr key={i}>
+                <td style={td}><input value={b.caption} onChange={(e) => updB(i, "caption", e.target.value)} style={inp} placeholder="POST: …" /></td>
+                <td style={td}><input value={b.date} onChange={(e) => updB(i, "date", e.target.value)} style={{ ...inp, width: 90 }} placeholder="5 mayo" /></td>
+                <td style={td}><input value={b.reach} onChange={(e) => updB(i, "reach", e.target.value)} style={{ ...inp, width: 90 }} inputMode="numeric" /></td>
+                <td style={td}><input value={b.likes} onChange={(e) => updB(i, "likes", e.target.value)} style={{ ...inp, width: 70 }} inputMode="numeric" /></td>
+                <td style={td}><input value={b.comments} onChange={(e) => updB(i, "comments", e.target.value)} style={{ ...inp, width: 70 }} inputMode="numeric" /></td>
+                <td style={td}><input value={b.thumb} onChange={(e) => updB(i, "thumb", e.target.value)} style={{ ...inp, minWidth: 160 }} placeholder="https://…" /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center" }}>
+        <button disabled={saving} onClick={save} style={{ ...miniBtn, background: BRAND, color: "#fff", border: "none" }}>{saving ? "Guardando…" : "Guardar Instagram"}</button>
+        {ok && <span style={{ color: "#16a34a", fontSize: 13 }}>✓ Guardado</span>}
+      </div>
+    </div>
+  );
+}
+
 function LinkedinEditor({ source, monthKey, onSave }) {
   const src = source || {};
   const seedM = (src.monthly || {})[monthKey] || {};
@@ -720,7 +800,7 @@ export default function Page() {
   const [sel, setSel] = useState(null);
 
   // Modo edición + overrides compartidos (servidor).
-  const [server, setServer] = useState({ conclusions: {}, competencia: null, linkedin: null, facebook: null, kv: false });
+  const [server, setServer] = useState({ conclusions: {}, competencia: null, linkedin: null, facebook: null, instagram: null, kv: false });
   const [editParam, setEditParam] = useState(false);
   const [editMode, setEditMode] = useState(false);
   // Pestañas principales del informe. Al exportar el PDF se muestran todas.
@@ -748,7 +828,7 @@ export default function Page() {
     try {
       const res = await fetch("/api/overrides", { cache: "no-store" });
       const j = await res.json();
-      setServer({ conclusions: j.conclusions || {}, competencia: j.competencia || null, linkedin: j.linkedin || null, facebook: j.facebook || null, kv: !!j.kv });
+      setServer({ conclusions: j.conclusions || {}, competencia: j.competencia || null, linkedin: j.linkedin || null, facebook: j.facebook || null, instagram: j.instagram || null, kv: !!j.kv });
     } catch (_) {}
   }, []);
 
@@ -802,6 +882,12 @@ export default function Page() {
     const j = await res.json().catch(() => ({})); alert("No se pudo guardar: " + (j.error || res.status)); return false;
   }, [editPass]);
 
+  const saveInstagram = useCallback(async (obj) => {
+    const res = await fetch("/api/overrides", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password: editPass, type: "instagram", value: obj }) });
+    if (res.ok) { setServer((s) => ({ ...s, instagram: obj })); return true; }
+    const j = await res.json().catch(() => ({})); alert("No se pudo guardar: " + (j.error || res.status)); return false;
+  }, [editPass]);
+
   // El PDF debe salir completo aunque estés parada en una pestaña: se montan todas,
   // se le da tiempo a los gráficos a dibujarse y recién ahí se abre el diálogo de impresión.
   const exportPdf = useCallback(() => {
@@ -839,16 +925,32 @@ export default function Page() {
     return i > 0 ? months[i - 1] : null;
   }, [months, sel]);
 
-  // --- Instagram ---
+  // --- Instagram (automático por API + override manual del CM por campo, sin perder lo demás) ---
   const ig = useMemo(() => {
-    const m = data?.instagram;
-    if (!m) return null;
-    const monthly = m.monthly || [];
-    const fMap = followersByMonth(monthly, m.followers ?? null, "newFollowers");
-    const cur = monthly.find((x) => x.key === sel) || null;
-    const prev = monthly.find((x) => x.key === prevKey) || null;
-    return { followers: fMap[sel] ?? m.followers, fPrev: fMap[prevKey] ?? null, username: m.username, cur, prev, best: m.bestByMonth?.[sel] || [], series: monthly };
-  }, [data, sel, prevKey]);
+    const api = data?.instagram;
+    const man = server.instagram || data?.manual?.instagram;
+    if (!api && !man) return null;
+    const apiMonthlyArr = api?.monthly || [];
+    const apiMonthly = {};
+    for (const x of apiMonthlyArr) apiMonthly[x.key] = x;
+    // Fusión por mes: base API + lo que el CM haya corregido (solo los campos con valor).
+    const monthlyOf = (k) => {
+      const a = apiMonthly[k] || null;
+      const mo = man?.monthly?.[k] || null;
+      if (a && mo) { const out = { ...a }; for (const kk of Object.keys(mo)) if (mo[kk] != null && mo[kk] !== "") out[kk] = mo[kk]; return out; }
+      return mo || a || null;
+    };
+    const fMap = followersByMonth(apiMonthlyArr, api?.followers ?? null, "newFollowers");
+    const manFollowers = man?.followers || {};
+    const cur = monthlyOf(sel);
+    const prev = monthlyOf(prevKey);
+    const followers = manFollowers[sel] ?? fMap[sel] ?? api?.followers ?? null;
+    const fPrev = manFollowers[prevKey] ?? fMap[prevKey] ?? null;
+    const best = (man?.best?.[sel]?.length ? man.best[sel] : api?.bestByMonth?.[sel]) || [];
+    const series = (data?.months || []).map((k) => ({ key: k, ...(monthlyOf(k) || {}) }));
+    const manual = !!(server.instagram || data?.manual?.instagram);
+    return { followers, fPrev, username: api?.username, cur, prev, best, series, hasMonth: !!cur, connected: !!api && !manual };
+  }, [data, server.instagram, sel, prevKey]);
 
   // --- Facebook (automático por API + override manual del CM con prioridad) ---
   const fb = useMemo(() => {
@@ -1116,8 +1218,11 @@ Revisar a inicio de mes en modo edición (<code>?edit</code>): leer las conclusi
 
       {showTab("contenidos") && (<>
       {/* INSTAGRAM */}
-      <Section title="📸 Instagram (orgánico)" subtitle={ig?.username ? `@${ig.username}` : undefined}>
+      <Section title={<span>📸 Instagram (orgánico) {ig && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: ig.connected ? "#dcfce7" : "#e5edf5", color: ig.connected ? "#166534" : BRAND, verticalAlign: "middle" }}>{ig.connected ? "AUTO · API" : "MANUAL"}{editMode ? " · EDITABLE" : ""}</span>}</span>} subtitle={ig?.username ? `@${ig.username}` : undefined}>
         {data?.errors?.instagram && <div style={{ color: "#b45309", fontSize: 13, marginBottom: 10 }}>Instagram: {data.errors.instagram}</div>}
+        {editMode && (
+          <InstagramEditor source={server.instagram || data?.manual?.instagram} monthKey={sel} seed={{ followers: ig?.followers, cur: ig?.cur, best: ig?.best }} onSave={saveInstagram} />
+        )}
         {ig?.cur ? (
           <>
             <div style={grid(150)}>
