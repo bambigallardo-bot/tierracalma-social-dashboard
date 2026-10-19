@@ -241,7 +241,7 @@ function aprendizajesMeta(key, cur, prev, best) {
   if (top) p.push(`El anuncio con mejor desempeño fue «${top.name}» (${fmt(top.result)} resultados${top.costPerResult != null ? ` a ${fmtMoney(top.costPerResult)} c/u` : ""}); conviene escalar sus creativos y duplicar lo que funcionó.`);
   if (cur.costPerLead != null && prev?.costPerLead != null) {
     const d = delta(cur.costPerLead, prev.costPerLead);
-    if (d) p.push(`El costo por lead ${d < 0 ? "bajó" : "subió"} ${absPct(d)} vs. el mes anterior${d < 0 ? ", señal de mayor eficiencia" : "; conviene revisar segmentación y creativos"}.`);
+    if (d) p.push(`El costo por lead ${d.dir < 0 ? "bajó" : "subió"} ${absPct(d)} vs. el mes anterior${d.dir < 0 ? ", señal de mayor eficiencia" : "; conviene revisar segmentación y creativos"}.`);
   }
   p.push("Recomendación: mantener los anuncios de menor costo por resultado, refrescar los creativos con fatiga y testear nuevos públicos para sostener el volumen.");
   return p.join(" ");
@@ -310,7 +310,7 @@ function execSummary(sel, ig, fb, ads, gads, ga4, li, email, wa) {
   const out = [];
   if (ig?.cur) out.push({ emoji: "📸", t: `Instagram: ${fmt(ig.followers)} seguidores · alcance ${fmt(ig.cur.reach)} · engagement ${fmtPct(ig.cur.engagement)}.` });
   if (fb?.cur) out.push({ emoji: "👍", t: `Facebook: ${fmt(fb.followers)} seguidores · ${fmt(fb.cur.impressions)} visualizaciones · ${fmt(fb.cur.engagement)} interacciones.` });
-  if (li?.cur) out.push({ emoji: "💼", t: `LinkedIn (IFB): ${fmt(li.followers)} seguidores · ${fmt(li.cur.impressions)} impresiones · ${fmt(li.cur.reactions)} reacciones.` });
+  if (li?.cur) out.push({ emoji: "💼", t: `LinkedIn: ${fmt(li.followers)} seguidores · ${fmt(li.cur.impressions)} impresiones · ${fmt(li.cur.reactions)} reacciones.` });
   if (ads?.cur) out.push({ emoji: "🎯", t: `Meta Ads: inversión ${fmtMoney(ads.cur.spend)}${ads.cur.leads ? ` · ${fmt(ads.cur.leads)} leads` : ""}${ads.cur.landingViews ? ` · ${fmt(ads.cur.landingViews)} visitas LP` : ""}${ads.cur.conversations ? ` · ${fmt(ads.cur.conversations)} conversaciones` : ""}.` });
   if (gads?.cur) out.push({ emoji: "🔎", t: `Google Ads: ${fmt(gads.cur.conversions)} conversiones · CTR ${fmtPct(gads.cur.ctr)} · inversión ${fmtMoney(gads.cur.cost)}.` });
   if (ga4?.cur) out.push({ emoji: "📊", t: `GA4: ${fmt(ga4.cur.activeUsers)} usuarios · ${fmt(ga4.cur.sessions)} sesiones · ${fmt(ga4.cur.keyEvents)} eventos clave.` });
@@ -328,7 +328,7 @@ function linkedinConclusion(key, cur, prev, followers, fPrev, best) {
   const dFoll = delta(followers, fPrev);
   const p = [];
   p.push(
-    `Durante ${mes}, Grupo IFB alcanzó los ${fmt(followers)} seguidores en LinkedIn${cur.acquired ? ` tras sumar ${fmt(cur.acquired)} nuevos` : ""}${dFoll ? ` (${trend(dFoll, "+", "−", "")}${absPct(dFoll)})` : ""}.`
+    `Durante ${mes}, la cuenta alcanzó los ${fmt(followers)} seguidores en LinkedIn${cur.acquired ? ` tras sumar ${fmt(cur.acquired)} nuevos` : ""}${dFoll ? ` (${trend(dFoll, "+", "−", "")}${absPct(dFoll)})` : ""}.`
   );
   p.push(`Las impresiones ${trend(dImp, "se elevaron", "bajaron", "se mantuvieron")}${dImp ? ` ${absPct(dImp)}` : ""} alcanzando las ${fmt(cur.impressions)}, y las reacciones ${trend(dReac, "subieron", "bajaron", "se mantuvieron")} a ${fmt(cur.reactions)}, situando el engagement en ${fmtPct(cur.engagement)}.`);
   if (best?.[0]) p.push(`El contenido más relevante fue «${best[0].label}» (${fmt(best[0].impressions)} impresiones), validando la respuesta de la comunidad profesional a los hitos institucionales.`);
@@ -431,7 +431,7 @@ function buildPlan(sel, ads, gads, ga4, ig, fb, email) {
   // Email: próxima acción según open/ctor.
   if (email?.cur) {
     const low = email.cur.clickRate != null && email.cur.clickRate < 2;
-    out.push({ emoji: "✉️", tone: low ? "warn" : "good", title: low ? "Reforzar el CTA del email" : "Mantener segmentación del email", text: low ? `El clic está bajo (${fmtPct(email.cur.clickRate)}). Usa un CTA único y claro y segmenta por comuna/necesidad operativa.` : `La segmentación operativa rinde (Open ${fmtPct(email.cur.openRate)}, CTOR ${fmtPct(email.cur.ctor)}). Reincorpora gradualmente campañas comerciales con beneficio claro.` });
+    out.push({ emoji: "✉️", tone: low ? "warn" : "good", title: low ? "Reforzar el CTA del email" : "Mantener segmentación del email", text: low ? `El clic está bajo (${fmtPct(email.cur.clickRate)}). Usa un CTA único y claro y segmenta la base según interés o comportamiento de compra.` : `La segmentación operativa rinde (Open ${fmtPct(email.cur.openRate)}, CTOR ${fmtPct(email.cur.ctor)}). Reincorpora gradualmente campañas comerciales con beneficio claro.` });
   }
 
   return out;
