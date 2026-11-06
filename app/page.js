@@ -353,7 +353,7 @@ function linkedinConclusion(key, cur, prev, followers, fPrev, best) {
 // Compara el ENGAGEMENT (ER%) de Más Center vs. la competencia.
 // Fórmula del informe: (Likes + Comentarios) / Seguidores × 100. Rango esperado 1–5%.
 // Cada marca tiene { followers, engagement } por mes; las cifras de la competencia son aproximadas.
-const RED_NAME = "MÁS CENTER";
+const RED_NAME = "TIERRA CALMA";
 function competenciaRows(block, key, prevKey) {
   if (!block) return [];
   const cur = block[key] || null;
@@ -388,10 +388,10 @@ function competenciaConclusion(rows) {
   const avgOthers = others.length ? Math.round((others.reduce((a, r) => a + r.er, 0) / others.length) * 100) / 100 : null;
   const p = [];
   p.push(
-    `Más Center registró un engagement de ${me.er != null ? fmtPct(me.er) : "—"} en el mes${avgOthers != null ? `, ${me.er > avgOthers ? "por sobre" : "frente a"} un promedio de ${fmtPct(avgOthers)} de la competencia` : ""}.`
+    `Tierra Calma registró un engagement de ${me.er != null ? fmtPct(me.er) : "—"} en el mes${avgOthers != null ? `, ${me.er > avgOthers ? "por sobre" : "frente a"} un promedio de ${fmtPct(avgOthers)} de la competencia` : ""}.`
   );
   if (others.length) p.push(`En el set competitivo, ${others.map((r) => `${r.brand} (${fmtPct(r.er)})`).join(", ")} operan con comunidades grandes y una estrategia enfocada en alcance masivo, lo que tiende a diluir su ER.`);
-  p.push(`El enfoque comunitario y la cercanía con locatarios le permiten a Más Center sostener un engagement por sobre el rango habitual del rubro.`);
+  p.push(`El enfoque comunitario y la cercanía con la audiencia le permiten a Tierra Calma sostener un engagement por sobre el rango habitual del rubro.`);
   return p.join(" ");
 }
 
@@ -481,7 +481,7 @@ function buildImprovements(sel, ig, fb, ads, gads, ga4, li, email, comp) {
     const me = comp.rows.find((r) => r.brand.toUpperCase().includes(RED_NAME));
     const others = comp.rows.filter((r) => r !== me && r.er != null);
     const avg = others.length ? others.reduce((a, r) => a + r.er, 0) / others.length : null;
-    if (me && avg != null && me.er != null && me.er < avg) out.push({ emoji: "🥊", tone: "warn", title: "Competencia: ER por debajo del set", text: `Más Center tuvo un ER de ${fmtPct(me.er)} vs un promedio de ${fmtPct(Math.round(avg * 100) / 100)} de la competencia. Refuerza dinámicas participativas (concursos, colaboraciones con locatarios) que activan comentarios y guardados.` });
+    if (me && avg != null && me.er != null && me.er < avg) out.push({ emoji: "🥊", tone: "warn", title: "Competencia: ER por debajo del set", text: `Tierra Calma tuvo un ER de ${fmtPct(me.er)} vs un promedio de ${fmtPct(Math.round(avg * 100) / 100)} de la competencia. Refuerza dinámicas participativas (concursos, dudas frecuentes, recorridos) que activan comentarios y guardados.` });
   }
 
   if (out.length === 0) out.push({ emoji: "✅", tone: "good", title: "Sin alertas relevantes", text: "Las métricas del mes están en rangos sanos. Mantén la consistencia y sigue testeando contenidos, audiencias y keywords." });
@@ -1434,6 +1434,40 @@ Revisar a inicio de mes en modo edición (<code>?edit</code>): leer las conclusi
         ) : !data?.errors?.facebook && <div style={alertBox}>⚠️ Sin datos de Facebook para {monthLabel(sel)}.{editMode ? " Llena los campos de arriba y guarda." : ""}</div>}
       </Section>
       )}
+
+      {/* COMPETENCIA (editable por el CM; ER% Instagram) */}
+      <Section title={<span>🥊 Análisis de competencia {editMode && <span style={chromeBadge}>EDITABLE</span>}</span>} subtitle="Engagement (ER%) de Tierra Calma vs. la competencia en Instagram.">
+        {editMode && (
+          <CompetenciaEditor source={compSource} monthKey={sel} prevMonthKey={prevKey} onSave={saveCompetencia} />
+        )}
+        {!comp?.hasMonth ? (
+          <div style={alertBox}>⚠️ Aún sin datos de competencia para {monthLabel(sel)}.{editMode ? " Llena la tabla de arriba y guarda." : " Se cargan en modo edición."}</div>
+        ) : (
+          <>
+            <div style={{ overflowX: "auto" }}>
+              <table style={tableStyle}>
+                <thead><tr><th style={th}>Marca</th><th style={th}>Seguidores</th><th style={th}>ER% {monthName(sel)}</th></tr></thead>
+                <tbody>
+                  {comp.rows.map((r) => {
+                    const mine = r.brand.toUpperCase().includes(RED_NAME);
+                    return (
+                      <tr key={r.brand} style={mine ? { background: "rgba(46,64,77,0.10)" } : undefined}>
+                        <td style={{ ...td, fontWeight: mine ? 700 : 400, color: mine ? BRAND : "#1a1a1a" }}>{r.brand}</td>
+                        <td style={td}>{fmt(r.followers)}</td>
+                        <td style={{ ...td, fontWeight: 600 }}>{r.er == null ? "—" : fmtPct(r.er)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <Conclusion id={`comp-${sel}`} text={competenciaConclusion(comp.rows)} />
+            <div style={{ color: "#9aa3af", fontSize: 12, marginTop: 14, fontStyle: "italic" }}>
+              Fórmula ER: (Likes + Comentarios) / Seguidores × 100 · rango esperado 1–5%. Al no contar con las cifras exactas de seguidores e interacciones de la competencia, sus resultados son aproximados.
+            </div>
+          </>
+        )}
+      </Section>
 
       </>)}
 
